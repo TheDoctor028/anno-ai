@@ -1,12 +1,15 @@
 package socketIO
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/go-resty/resty/v2"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -15,22 +18,49 @@ type SocketIOClient struct {
 
 	ReceiveMessage chan []byte
 	SendMessage    chan []byte
-	done           chan struct{}
-	dialer         websocket.Dialer
+	Done           chan struct{}
+	pong           chan struct{}
+	dialer         *websocket.Dialer
+	rest           *resty.Client
 }
 
-func NewSocketIOClient(host string, queryParams string, healthCheckTimed time.Duration) *SocketIOClient {
+func NewSocketIOClient(host string) *SocketIOClient {
+	r := resty.New()
 
-	u, err := url.Parse(fmt.Sprintf("wss://%s/socket.io/%s", host, queryParams))
+	initRes, err := r.R().Get(fmt.Sprintf("https://%s/socket.io/?EIO=3&transport=polling&t=P9JsPIX", host))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if initRes == nil || initRes.StatusCode() != http.StatusOK {
+		log.Fatal("No response received for socket.io init")
+	}
+
+	woPrefix, _ := strings.CutPrefix(initRes.String(), "96:0")
+	jsonString, _ := strings.CutSuffix(woPrefix, "2:40")
+
+	var socketIOConfig struct {
+		Sid          string `json:"sid,omitempty"`
+		PingInterval int    `json:"pingInterval,omitempty"`
+		PingTimeout  int    `json:"pingTimeout,omitempty"`
+	}
+	err = json.Unmarshal([]byte(jsonString), &socketIOConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(socketIOConfig.Sid)
+
+	u, err := url.Parse(fmt.Sprintf("wss://%s/socket.io/?EIO=3&transport=websocket&sid=%s", host, socketIOConfig.Sid))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("Connecting to %s", u.String())
 
-	d := websocket.Dialer{
+	d := &websocket.Dialer{
 		Proxy:             http.ProxyFromEnvironment,
-		HandshakeTimeout:  30 * time.Second,
+		HandshakeTimeout:  5 * time.Second,
 		Subprotocols:      []string{"soap"},
 		EnableCompression: true,
 	}
@@ -54,7 +84,7 @@ func NewSocketIOClient(host string, queryParams string, healthCheckTimed time.Du
 
 		ws:     ws,
 		dialer: d,
-		done:   make(chan struct{}),
+		Done:   make(chan struct{}),
 	}
 
 	log.Printf("Connected to %s", u.String())
@@ -72,10 +102,17 @@ func NewSocketIOClient(host string, queryParams string, healthCheckTimed time.Du
 
 	if string(msg) == SHELLO {
 		log.Println("Received SHELLO")
+		log.Println("Sending ACKHELLO")
 		if err = ws.WriteMessage(websocket.TextMessage, []byte(ACKHELLO)); err != nil {
 			log.Println("Error sending ACKHELLO: ", err)
 		}
-		c.startPing(healthCheckTimed, c.done)
+		log.Println("Sent ACKHELLO")
+
+		go c.startPing(time.Duration(socketIOConfig.PingInterval)*time.Millisecond, c.Done)
+		ws.SetCloseHandler(func(code int, text string) error {
+			c.Done <- struct{}{}
+			return nil
+		})
 	}
 
 	return c
@@ -92,6 +129,9 @@ func (c *SocketIOClient) startPing(healthCheckTime time.Duration, done chan stru
 				log.Printf("Error sending ping: %v", err)
 				return
 			}
+			log.Println("Ping ---->")
+			<-c.pong
+			log.Println("<---- Pong")
 		case <-done:
 			return
 		}
