@@ -97,7 +97,7 @@ type OnChatStartData struct {
 
 func NewOnChatStartData(data map[string]interface{}) OnChatStartData {
 	return OnChatStartData{
-		PartnerGender: data["partner_gender"].(PersonGender),
+		PartnerGender: PersonGender(data["partner_gender"].(string)),
 		ChatID:        data["chatId"].(string),
 	}
 }
