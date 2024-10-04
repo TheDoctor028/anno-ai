@@ -16,8 +16,8 @@ import (
 type Client struct {
 	ws *websocket.Conn
 
-	ReceiveMessage chan []byte
-	SendMessage    chan []byte
+	ReceiveMessage chan Message
+	SendMessage    chan Message
 	Done           chan struct{}
 	pong           chan struct{}
 	dialer         *websocket.Dialer
@@ -55,8 +55,8 @@ func NewSocketIOClient(host string) (*Client, error) {
 	}
 
 	c := &Client{
-		ReceiveMessage: make(chan []byte),
-		SendMessage:    make(chan []byte),
+		ReceiveMessage: make(chan Message),
+		SendMessage:    make(chan Message),
 
 		ws:     ws,
 		dialer: d,
@@ -155,11 +155,20 @@ func (c *Client) handleIncoming() {
 		}
 
 		if string(msg) == PONG {
-			log.Println("<---- Pong")
 			continue
 		}
 		if strings.HasPrefix(string(msg), MESSAGE) {
-			c.ReceiveMessage <- []byte(strings.TrimPrefix(string(msg), MESSAGE))
+			msgWoPrefix, _ := strings.CutPrefix(string(msg), MESSAGE)
+			var m []interface{}
+			err = json.Unmarshal([]byte(msgWoPrefix), &m)
+			if err != nil {
+				log.Printf("Error unmarshaling message: %s %v", string(msg), err)
+			}
+
+			c.ReceiveMessage <- Message{
+				Type: m[0].(string),
+				Data: m[1],
+			}
 		} else {
 			log.Printf("Received unknow type message: %s", string(msg))
 		}
@@ -170,8 +179,14 @@ func (c *Client) handelOutgoing() {
 	for {
 		select {
 		case msg := <-c.SendMessage:
-			log.Println("Sending message: ", string(msg))
-			if err := c.ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s%s", MESSAGE, msg))); err != nil {
+			data, err := json.Marshal(msg.Data)
+			if err != nil {
+				log.Println("Error marshaling message: ", err)
+			}
+			message := []byte(fmt.Sprintf("%s[%s,%s]", MESSAGE, msg.Type, data))
+			log.Println("Sending message: ", string(message))
+
+			if err := c.ws.WriteMessage(websocket.TextMessage, message); err != nil {
 				log.Println("Error sending message: ", err)
 			}
 		case <-c.Done:

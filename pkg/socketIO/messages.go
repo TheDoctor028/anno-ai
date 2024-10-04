@@ -8,3 +8,8 @@ const (
 	PONG     = "3"
 	MESSAGE  = "42"
 )
+
+type Message struct {
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
+}
