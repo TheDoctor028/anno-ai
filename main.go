@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/annotalk"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
 	"log"
@@ -22,6 +23,19 @@ func main() {
 		InterestedInGender: annotalk.Whatever,
 		Description:        "I'm a bot",
 	})
+
+	go func() {
+		log.Println("Type your message to send")
+		for {
+			msg := ""
+			_, err := fmt.Scanln(&msg)
+			if err != nil {
+				log.Println(err)
+			}
+
+			chat.SendMessage(msg)
+		}
+	}()
 
 	for {
 		select {

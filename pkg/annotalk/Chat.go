@@ -20,6 +20,7 @@ type Message struct {
 type Chat struct {
 	filterStats    bool
 	client         *socketIO.Client
+	inChat         bool
 	alreadyHadChat bool
 	messages       []Message
 
@@ -30,6 +31,7 @@ func NewChat(filterStats bool, client *socketIO.Client) *Chat {
 	c := &Chat{
 		MessageEventsChannels: NewMessageEvents(),
 
+		inChat:         false,
 		alreadyHadChat: false,
 		filterStats:    filterStats,
 		client:         client,
@@ -67,6 +69,7 @@ func (c *Chat) MessageHandler() {
 				}
 				go func() { c.MessageEventsChannels.Stats <- NewOnStatisticsData(msg.Data) }()
 			case string(OnChatStart):
+				c.inChat = true
 				log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
 				go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 			case string(OnMessage):
@@ -77,6 +80,7 @@ func (c *Chat) MessageHandler() {
 					go func() { c.MessageEventsChannels.Message <- NewOnMessageData(msg.Data) }()
 				}
 			case string(OnChatEnd):
+				c.inChat = false
 				log.Println("Chat ended")
 				go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
 			case string(OnSearchingPartner):
@@ -84,5 +88,19 @@ func (c *Chat) MessageHandler() {
 				go func() { c.MessageEventsChannels.SearchingPartner <- struct{}{} }()
 			}
 		}
+	}
+}
+
+func (c *Chat) SendMessage(msg string) {
+	if c.inChat {
+		c.client.SendMessage <- socketIO.OutgoingMessage{
+			Type: string(SendMessage),
+			Data: SendMessageData{
+				Message: msg,
+			},
+		}
+		c.messages = append(c.messages, Message{Entity: User, Msg: msg})
+	} else {
+		log.Println("You are not in a chat")
 	}
 }
