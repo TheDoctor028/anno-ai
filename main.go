@@ -15,6 +15,10 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	startAnnoTalkChat(err)
+}
+
+func startAnnoTalkChat(err error) {
 	sio, err := socketIO.NewSocketIOClient(
 		"husrv.anotalk.hu",
 	)
@@ -25,10 +29,10 @@ func main() {
 	chat := annotalk.NewChat(true, sio)
 	chat.StartNewChat(annotalk.Persona{
 		Name:               "Viktor",
-		Age:                27,
-		Gender:             annotalk.Woman,
-		InterestedInGender: annotalk.Man,
-		Description:        "I'm a bot",
+		Age:                25,
+		Gender:             annotalk.Man,
+		InterestedInGender: annotalk.Whatever,
+		Description:        "",
 	})
 
 	go func() {
@@ -61,5 +65,4 @@ func main() {
 
 		}
 	}
-
 }

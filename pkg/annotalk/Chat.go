@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
 	"log"
+	"math/rand"
 	"os"
+	"sync"
 	"time"
 )
 import "github.com/TheDoctor028/annotalk-chatgpt/pkg/utils"
@@ -26,6 +28,7 @@ type Message struct {
 type Chat struct {
 	filterStats    bool
 	client         *socketIO.Client
+	ai             *AI
 	inChat         bool
 	alreadyHadChat bool
 
@@ -33,6 +36,7 @@ type Chat struct {
 	messages        []Message
 	stats           OnStatisticsData
 	person          *Persona
+	typing          sync.Mutex
 
 	MessageEventsChannels *MessageEvents
 }
@@ -74,6 +78,35 @@ func (c *Chat) StartNewChat(self Persona) {
 	<-c.MessageEventsChannels.SearchingPartner
 	<-c.MessageEventsChannels.ChatStart
 	c.alreadyHadChat = true
+
+	var err error
+	c.ai, err = NewAI(self, self.InterestedInGender)
+	if err != nil {
+		log.Println(err)
+		c.EndChat()
+	}
+}
+
+func (c *Chat) firstMessage() {
+	t := time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second)
+	<-t.C
+	if c.inChat {
+		if c.typing.TryLock() {
+			defer c.typing.Unlock()
+			c.client.SendMessage <- socketIO.OutgoingMessage{
+				Type: string(Typing),
+			}
+			msg, err := c.ai.GetAnswer(c.messages)
+			if err != nil {
+				log.Printf("Error getting answer %s", err)
+			} else {
+				c.SendMessage(msg, Bot)
+				c.client.SendMessage <- socketIO.OutgoingMessage{
+					Type: string(DoneTyping),
+				}
+			}
+		}
+	}
 }
 
 func (c *Chat) FindNewPartner() {
@@ -103,6 +136,7 @@ func (c *Chat) MessageHandler() {
 				c.conversationsID = &id
 				log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
 				go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
+				go c.firstMessage()
 			case string(OnMessage):
 				c.onMessage(msg)
 			case string(OnChatEnd):
@@ -116,10 +150,7 @@ func (c *Chat) MessageHandler() {
 }
 
 func (c *Chat) onChatEnd() {
-	c.conversationsID = nil
-	c.inChat = false
 	log.Println("Chat ended")
-	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
 
 	msgsJson, err := json.Marshal(struct {
 		Id        string    `json:"id"`
@@ -140,12 +171,16 @@ func (c *Chat) onChatEnd() {
 	if err := os.WriteFile(fileName, msgsJson, 0644); err != nil {
 		log.Printf("Error writing conversation to file %s %s", fileName, err)
 	}
+
+	c.conversationsID = nil
+	c.inChat = false
+	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
 }
 
 func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 	if NewOnMessageData(msg.Data).IsYou == 0 {
 		msgTxt := NewOnMessageData(msg.Data).Message
-		log.Printf("Your partner: %v", msgTxt)
+		log.Printf("Partner: %v", msgTxt)
 		c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
 		go func() { c.MessageEventsChannels.Message <- NewOnMessageData(msg.Data) }()
 	}
@@ -160,6 +195,9 @@ func (c *Chat) SendMessage(msg string, entity Entity) {
 			},
 		}
 		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
+		if entity == Bot {
+			log.Println("Bot: ", msg)
+		}
 	} else {
 		log.Println("You are not in a chat")
 	}

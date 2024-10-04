@@ -1,11 +1,10 @@
-package ai
+package annotalk
 
 import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"github.com/TheDoctor028/annotalk-chatgpt/pkg/annotalk"
 	"github.com/sashabaranov/go-openai"
 	"os"
 	"text/template"
@@ -26,12 +25,12 @@ Egy rövid leírás rólad:
 
 type AI struct {
 	client  *openai.Client
-	persona annotalk.Persona
+	persona Persona
 
 	instructions string
 }
 
-func NewAI(persona annotalk.Persona, partnerGender annotalk.PersonGender) (*AI, error) {
+func NewAI(persona Persona, partnerGender PersonGender) (*AI, error) {
 	token := os.Getenv("CHAT_GPT_TOKEN")
 	if token == "" {
 		return nil, errors.New("CHAT_GPT_TOKEN is not provided")
@@ -46,8 +45,8 @@ func NewAI(persona annotalk.Persona, partnerGender annotalk.PersonGender) (*AI, 
 
 	buf := bytes.NewBuffer(nil)
 	err = baseTmplt.Execute(buf, struct {
-		PartnerGender annotalk.PersonGender
-		annotalk.Persona
+		PartnerGender PersonGender
+		Persona
 	}{
 		Persona:       persona,
 		PartnerGender: partnerGender,
@@ -63,7 +62,7 @@ func NewAI(persona annotalk.Persona, partnerGender annotalk.PersonGender) (*AI, 
 	}, nil
 }
 
-func (a *AI) GetAnswer(messages []annotalk.Message) (string, error) {
+func (a *AI) GetAnswer(messages []Message) (string, error) {
 	resp, err := a.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
@@ -85,20 +84,20 @@ func (a *AI) GetAnswer(messages []annotalk.Message) (string, error) {
 	return resp.Choices[0].Message.Content, nil
 }
 
-func mapMessagesToOpenAIMessages(messages []annotalk.Message) []openai.ChatCompletionMessage {
+func mapMessagesToOpenAIMessages(messages []Message) []openai.ChatCompletionMessage {
 	var openAIMessages []openai.ChatCompletionMessage
 	for _, msg := range messages {
 		if len(msg.Msg) == 0 {
 			continue
 		}
 
-		if msg.Entity == annotalk.Partner {
+		if msg.Entity == Partner {
 			openAIMessages = append(openAIMessages, openai.ChatCompletionMessage{
 				Role:    openai.ChatMessageRoleUser,
 				Content: msg.Msg,
 			})
 		}
-		if msg.Entity == annotalk.Bot || msg.Entity == annotalk.User {
+		if msg.Entity == Bot || msg.Entity == User {
 			openAIMessages = append(openAIMessages, openai.ChatCompletionMessage{
 				Role:    openai.ChatMessageRoleAssistant,
 				Content: msg.Msg,
