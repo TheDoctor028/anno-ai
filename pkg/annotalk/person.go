@@ -9,10 +9,9 @@ const (
 )
 
 type Person struct {
-	Name               string
-	Age                int
-	Gender             PersonGender
-	InterestedInGender PersonGender
-
-	Description string
+	Name               string       `json:"name"`
+	Age                int          `json:"age"`
+	Gender             PersonGender `json:"gender"`
+	InterestedInGender PersonGender `json:"interestedInGender"`
+	Description        string       `json:"description"`
 }

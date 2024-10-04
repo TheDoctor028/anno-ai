@@ -38,13 +38,14 @@ const (
 	DoneTyping     MessageType = "doneTyping"
 	SendMessage    MessageType = "sendMessage"
 	LookForPartner MessageType = "lookForPartner"
+	LeaveChat      MessageType = "leaveChat"
 )
 
 type Sender int
 
 const (
 	MessageFromPartner Sender = 0
-	MessageFromYou            = 1
+	MessageFromYou     Sender = 1
 )
 
 type OnStatisticsData struct {
