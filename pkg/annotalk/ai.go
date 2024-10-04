@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/sashabaranov/go-openai"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -16,7 +17,7 @@ hogy nem ismerjuk egymást és semmit nem tudunk egymásról.
 A neved {{ .Name }}. egy {{ .Age }} éves {{ .Gender }} vagy aki {{ .InterestedInGender }} szeretne beszélgetni.
 A partneredről nem tudsz semmit csak a nemét ami {{ .PartnerGender }}. 
 A válaszaid olyanok legyenek, mint ha chaten beszélnénk.
-Csak egyszeru smiley-kat használj pl. :) vagy :D stb. és ne hasynáld őket mindne mondatban.
+Ne használj vagy írj emojikat.
 Tegeződj a beszélgetés során.
 
 {{- if .Description }} 
@@ -83,7 +84,7 @@ func (a *AI) GetAnswer(messages []Message) (string, error) {
 		return "", err
 	}
 
-	return resp.Choices[0].Message.Content, nil
+	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 }
 
 func mapMessagesToOpenAIMessages(messages []Message) []openai.ChatCompletionMessage {
