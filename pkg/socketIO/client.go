@@ -84,6 +84,7 @@ func NewSocketIOClient(host string) (*Client, error) {
 		}
 		log.Println("Sent ACKHELLO")
 
+		go c.handelOutgoing()
 		go c.handleIncoming()
 		go c.startPing(time.Duration(socketIOConfig.PingInterval)*time.Millisecond, c.Done)
 		ws.SetCloseHandler(func(code int, text string) error {
@@ -150,16 +151,32 @@ func (c *Client) handleIncoming() {
 		_, msg, err := c.ws.ReadMessage()
 		if err != nil {
 			log.Println("Error reading message: ", err)
+			return
 		}
 
 		if string(msg) == PONG {
 			log.Println("<---- Pong")
 			continue
 		}
-		if strings.HasPrefix(string(msg), MESSAGE_SERVER) {
-			c.ReceiveMessage <- []byte(strings.TrimPrefix(string(msg), MESSAGE_SERVER))
+		if strings.HasPrefix(string(msg), MESSAGE) {
+			c.ReceiveMessage <- []byte(strings.TrimPrefix(string(msg), MESSAGE))
 		} else {
 			log.Printf("Received unknow type message: %s", string(msg))
 		}
 	}
+}
+
+func (c *Client) handelOutgoing() {
+	for {
+		select {
+		case msg := <-c.SendMessage:
+			log.Println("Sending message: ", string(msg))
+			if err := c.ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s%s", MESSAGE, msg))); err != nil {
+				log.Println("Error sending message: ", err)
+			}
+		case <-c.Done:
+			return
+		}
+	}
+
 }
