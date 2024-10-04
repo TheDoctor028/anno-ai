@@ -9,7 +9,12 @@ const (
 	MESSAGE  = "42"
 )
 
-type Message struct {
+type IncomingMessage struct {
+	Type string                 `json:"type"`
+	Data map[string]interface{} `json:"data"`
+}
+
+type OutgoingMessage struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }

@@ -18,29 +18,36 @@ Messages examples
 	42["onSearchingPartner",{}]
 */
 
+type MessageType string
+
+// Incoming messages
 const (
-	OnStatistics       = "onStatistics"
-	InitChat           = "initChat"
-	OnChatStart        = "onChatStart"
-	OnTyping           = "onTyping"
-	OnMessage          = "onMessage"
-	OnDoneTyping       = "onDoneTyping"
-	Typing             = "typing"
-	SendMessage        = "sendMessage"
-	DoneTyping         = "doneTyping"
-	OnChatEnd          = "onChatEnd"
-	LookForPartner     = "lookForPartner"
-	OnSearchingPartner = "onSearchingPartner"
+	OnStatistics       MessageType = "onStatistics"
+	OnChatStart        MessageType = "onChatStart"
+	OnTyping           MessageType = "onTyping"
+	OnMessage          MessageType = "onMessage"
+	OnDoneTyping       MessageType = "onDoneTyping"
+	OnChatEnd          MessageType = "onChatEnd"
+	OnSearchingPartner MessageType = "onSearchingPartner"
 )
 
-type MessageType int
-
+// Outgoing messages types
 const (
-	MessageFromPartner MessageType = 0
-	MessageFromYou                 = 1
+	InitChat       MessageType = "initChat"
+	Typing         MessageType = "typing"
+	DoneTyping     MessageType = "doneTyping"
+	SendMessage    MessageType = "sendMessage"
+	LookForPartner MessageType = "lookForPartner"
 )
 
-type StatisticsData struct {
+type Sender int
+
+const (
+	MessageFromPartner Sender = 0
+	MessageFromYou            = 1
+)
+
+type OnStatisticsData struct {
 	Man struct {
 		WantWithWoman    int `json:"wantWithWoman"`
 		WantWithMan      int `json:"wantWithMan"`
@@ -51,6 +58,29 @@ type StatisticsData struct {
 		WantWithMan      int `json:"wantWithMan"`
 		WantWithWhatever int `json:"wantWithWhatever"`
 	} `json:"woman"`
+}
+
+func NewOnStatisticsData(data map[string]interface{}) OnStatisticsData {
+	return OnStatisticsData{
+		Man: struct {
+			WantWithWoman    int `json:"wantWithWoman"`
+			WantWithMan      int `json:"wantWithMan"`
+			WantWithWhatever int `json:"wantWithWhatever"`
+		}{
+			int((data["man"]).(map[string]interface{})["wantWithWoman"].(float64)),
+			int((data["man"]).(map[string]interface{})["wantWithMan"].(float64)),
+			int((data["man"]).(map[string]interface{})["wantWithWhatever"].(float64)),
+		},
+		Woman: struct {
+			WantWithWoman    int `json:"wantWithWoman"`
+			WantWithMan      int `json:"wantWithMan"`
+			WantWithWhatever int `json:"wantWithWhatever"`
+		}{
+			int((data["woman"]).(map[string]interface{})["wantWithWoman"].(float64)),
+			int((data["woman"]).(map[string]interface{})["wantWithMan"].(float64)),
+			int((data["woman"]).(map[string]interface{})["wantWithWhatever"].(float64)),
+		},
+	}
 }
 
 type InitChatData struct {
@@ -64,11 +94,49 @@ type OnChatStartData struct {
 	ChatID        string `json:"chatId"`
 }
 
+func NewOnChatStartData(data map[string]interface{}) OnChatStartData {
+	return OnChatStartData{
+		PartnerGender: data["partner_gender"].(string),
+		ChatID:        data["chatId"].(string),
+	}
+}
+
 type OnMessageData struct {
-	Message string      `json:"message"`
-	IsYou   MessageType `json:"isYou"` // 0 - partner, 1 - you
+	Message string `json:"message"`
+	IsYou   Sender `json:"isYou"` // 0 - partner, 1 - you
+}
+
+func NewOnMessageData(data map[string]interface{}) OnMessageData {
+	return OnMessageData{
+		Message: data["message"].(string),
+		IsYou:   Sender(data["isYou"].(float64)),
+	}
 }
 
 type SendMessageData struct {
 	Message string `json:"message"`
+}
+
+func NewSendMessageData(data map[string]interface{}) SendMessageData {
+	return SendMessageData{
+		Message: data["message"].(string),
+	}
+}
+
+type MessageEvents struct {
+	Stats            chan OnStatisticsData
+	ChatStart        chan OnChatStartData
+	Message          chan OnMessageData
+	ChatEnd          chan struct{}
+	SearchingPartner chan struct{}
+}
+
+func NewMessageEvents() *MessageEvents {
+	return &MessageEvents{
+		Stats:            make(chan OnStatisticsData),
+		ChatStart:        make(chan OnChatStartData),
+		Message:          make(chan OnMessageData),
+		ChatEnd:          make(chan struct{}),
+		SearchingPartner: make(chan struct{}),
+	}
 }

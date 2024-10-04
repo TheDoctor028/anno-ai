@@ -16,8 +16,8 @@ import (
 type Client struct {
 	ws *websocket.Conn
 
-	ReceiveMessage chan Message
-	SendMessage    chan Message
+	ReceiveMessage chan IncomingMessage
+	SendMessage    chan OutgoingMessage
 	Done           chan struct{}
 	pong           chan struct{}
 	dialer         *websocket.Dialer
@@ -55,8 +55,8 @@ func NewSocketIOClient(host string) (*Client, error) {
 	}
 
 	c := &Client{
-		ReceiveMessage: make(chan Message),
-		SendMessage:    make(chan Message),
+		ReceiveMessage: make(chan IncomingMessage),
+		SendMessage:    make(chan OutgoingMessage),
 
 		ws:     ws,
 		dialer: d,
@@ -138,7 +138,6 @@ func (c *Client) startPing(healthCheckTime time.Duration, done chan struct{}) {
 				log.Printf("Error sending ping: %v", err)
 				return
 			}
-			log.Println("Ping ---->")
 		case <-done:
 			return
 		}
@@ -165,9 +164,9 @@ func (c *Client) handleIncoming() {
 				log.Printf("Error unmarshaling message: %s %v", string(msg), err)
 			}
 
-			c.ReceiveMessage <- Message{
+			c.ReceiveMessage <- IncomingMessage{
 				Type: m[0].(string),
-				Data: m[1],
+				Data: m[1].(map[string]interface{}),
 			}
 		} else {
 			log.Printf("Received unknow type message: %s", string(msg))
