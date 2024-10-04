@@ -37,6 +37,7 @@ type Chat struct {
 	stats           OnStatisticsData
 	person          *Persona
 	typing          sync.Mutex
+	aiResponseTimer *time.Timer
 
 	MessageEventsChannels *MessageEvents
 }
@@ -50,8 +51,9 @@ func NewChat(filterStats bool, client *socketIO.Client) *Chat {
 		filterStats:    filterStats,
 		client:         client,
 
-		messages: []Message{},
-		person:   nil,
+		messages:        []Message{},
+		person:          nil,
+		aiResponseTimer: time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second),
 	}
 
 	go c.messageHandler()
@@ -142,7 +144,6 @@ func (c *Chat) messageHandler() {
 				c.conversationsID = &id
 				log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
 				go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
-				go c.firstMessage()
 			case string(OnMessage):
 				c.onMessage(msg)
 			case string(OnChatEnd):
@@ -151,6 +152,8 @@ func (c *Chat) messageHandler() {
 				log.Println("Searching for partner")
 				go func() { c.MessageEventsChannels.SearchingPartner <- struct{}{} }()
 			}
+		case <-c.aiResponseTimer.C:
+			go c.sendAIMessage()
 		}
 	}
 }
@@ -188,13 +191,12 @@ func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 		msgTxt := NewOnMessageData(msg.Data).Message
 		log.Printf("Partner: %v", msgTxt)
 		c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
+		c.aiResponseTimer.Reset(time.Duration((rand.Int()%5)+5) * time.Second)
 		go func() { c.MessageEventsChannels.Message <- NewOnMessageData(msg.Data) }()
 	}
 }
 
-func (c *Chat) firstMessage() {
-	t := time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second)
-	<-t.C
+func (c *Chat) sendAIMessage() {
 	if c.inChat {
 		if c.typing.TryLock() {
 			defer c.typing.Unlock()
