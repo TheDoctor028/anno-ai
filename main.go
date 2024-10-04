@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/TheDoctor028/annotalk-chatgpt/pkg/annotalk"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
 	"log"
 )
@@ -12,6 +13,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	chat := annotalk.NewChat(true, sio)
+	chat.StartNewChat(annotalk.Person{
+		Name:               "Viktor",
+		Age:                27,
+		Gender:             annotalk.Man,
+		InterestedInGender: annotalk.Whatever,
+		Description:        "I'm a bot",
+	})
 
 	for {
 		select {

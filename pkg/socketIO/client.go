@@ -183,7 +183,7 @@ func (c *Client) handelOutgoing() {
 			if err != nil {
 				log.Println("Error marshaling message: ", err)
 			}
-			message := []byte(fmt.Sprintf("%s[%s,%s]", MESSAGE, msg.Type, data))
+			message := []byte(fmt.Sprintf("%s[\"%s\",%s]", MESSAGE, msg.Type, data))
 			log.Println("Sending message: ", string(message))
 
 			if err := c.ws.WriteMessage(websocket.TextMessage, message); err != nil {
