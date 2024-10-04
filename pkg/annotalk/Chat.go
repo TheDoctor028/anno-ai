@@ -33,6 +33,7 @@ type Chat struct {
 	alreadyHadChat bool
 
 	conversationsID *string
+	partnerGender   *PersonGender
 	messages        []Message
 	stats           OnStatisticsData
 	person          *Persona
@@ -139,11 +140,7 @@ func (c *Chat) messageHandler() {
 				}
 				c.stats = NewOnStatisticsData(msg.Data)
 			case string(OnChatStart):
-				id := NewOnChatStartData(msg.Data).ChatID
-				c.inChat = true
-				c.conversationsID = &id
-				log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
-				go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
+				c.onChatStart(msg)
 			case string(OnMessage):
 				c.onMessage(msg)
 			case string(OnChatEnd):
@@ -158,19 +155,30 @@ func (c *Chat) messageHandler() {
 	}
 }
 
+func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
+	data := NewOnChatStartData(msg.Data)
+	c.inChat = true
+	c.conversationsID = &data.ChatID
+	c.partnerGender = &data.PartnerGender
+	log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
+	go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
+}
+
 func (c *Chat) onChatEnd() {
 	log.Println("Chat ended")
 
 	msgsJson, err := json.Marshal(struct {
-		Id        string    `json:"id"`
-		Timestamp string    `json:"timestamp"`
-		Person    Persona   `json:"person"`
-		Messages  []Message `json:"messages"`
+		Id            string       `json:"id"`
+		Timestamp     string       `json:"timestamp"`
+		Person        Persona      `json:"person"`
+		PartnerGender PersonGender `json:"partnerGender"`
+		Messages      []Message    `json:"messages"`
 	}{
-		Id:        *c.conversationsID,
-		Timestamp: time.Now().Format(time.RFC3339),
-		Person:    *c.person,
-		Messages:  c.messages,
+		Id:            *c.conversationsID,
+		Timestamp:     time.Now().Format(time.RFC3339),
+		Person:        *c.person,
+		PartnerGender: *c.partnerGender,
+		Messages:      c.messages,
 	})
 	if err != nil {
 		log.Printf("Error marshalling messages %s", err)
