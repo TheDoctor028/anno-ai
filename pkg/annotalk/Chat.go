@@ -54,7 +54,7 @@ func NewChat(filterStats bool, client *socketIO.Client) *Chat {
 		person:   nil,
 	}
 
-	go c.MessageHandler()
+	go c.messageHandler()
 	return c
 }
 
@@ -87,28 +87,6 @@ func (c *Chat) StartNewChat(self Persona) {
 	}
 }
 
-func (c *Chat) firstMessage() {
-	t := time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second)
-	<-t.C
-	if c.inChat {
-		if c.typing.TryLock() {
-			defer c.typing.Unlock()
-			c.client.SendMessage <- socketIO.OutgoingMessage{
-				Type: string(Typing),
-			}
-			msg, err := c.ai.GetAnswer(c.messages)
-			if err != nil {
-				log.Printf("Error getting answer %s", err)
-			} else {
-				c.SendMessage(msg, Bot)
-				c.client.SendMessage <- socketIO.OutgoingMessage{
-					Type: string(DoneTyping),
-				}
-			}
-		}
-	}
-}
-
 func (c *Chat) FindNewPartner() {
 	if !c.inChat && c.person != nil {
 		c.messages = []Message{}
@@ -120,7 +98,35 @@ func (c *Chat) FindNewPartner() {
 	}
 }
 
-func (c *Chat) MessageHandler() {
+func (c *Chat) SendMessage(msg string, entity Entity) {
+	if c.inChat {
+		c.client.SendMessage <- socketIO.OutgoingMessage{
+			Type: string(SendMessage),
+			Data: SendMessageData{
+				Message: msg,
+			},
+		}
+		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
+		if entity == Bot {
+			log.Println("Bot: ", msg)
+		}
+	} else {
+		log.Println("You are not in a chat")
+	}
+}
+
+func (c *Chat) EndChat() {
+	if c.inChat {
+		c.client.SendMessage <- socketIO.OutgoingMessage{
+			Type: string(LeaveChat),
+			Data: map[string]interface{}{},
+		}
+		<-c.MessageEventsChannels.ChatEnd
+		log.Println("Chat ended")
+	}
+}
+
+func (c *Chat) messageHandler() {
 	for {
 		select {
 		case msg := <-c.client.ReceiveMessage:
@@ -186,30 +192,24 @@ func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 	}
 }
 
-func (c *Chat) SendMessage(msg string, entity Entity) {
+func (c *Chat) firstMessage() {
+	t := time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second)
+	<-t.C
 	if c.inChat {
-		c.client.SendMessage <- socketIO.OutgoingMessage{
-			Type: string(SendMessage),
-			Data: SendMessageData{
-				Message: msg,
-			},
+		if c.typing.TryLock() {
+			defer c.typing.Unlock()
+			c.client.SendMessage <- socketIO.OutgoingMessage{
+				Type: string(Typing),
+			}
+			msg, err := c.ai.GetAnswer(c.messages)
+			if err != nil {
+				log.Printf("Error getting answer %s", err)
+			} else {
+				c.SendMessage(msg, Bot)
+				c.client.SendMessage <- socketIO.OutgoingMessage{
+					Type: string(DoneTyping),
+				}
+			}
 		}
-		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
-		if entity == Bot {
-			log.Println("Bot: ", msg)
-		}
-	} else {
-		log.Println("You are not in a chat")
-	}
-}
-
-func (c *Chat) EndChat() {
-	if c.inChat {
-		c.client.SendMessage <- socketIO.OutgoingMessage{
-			Type: string(LeaveChat),
-			Data: map[string]interface{}{},
-		}
-		<-c.MessageEventsChannels.ChatEnd
-		log.Println("Chat ended")
 	}
 }
