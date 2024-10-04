@@ -206,7 +206,7 @@ func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 }
 
 func (c *Chat) sendAIMessage() {
-	if c.inChat {
+	if c.inChat && c.messages[len(c.messages)-1].Entity != Bot {
 		if c.typing.TryLock() {
 			defer c.typing.Unlock()
 			c.client.SendMessage <- socketIO.OutgoingMessage{
