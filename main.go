@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/annotalk"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
+	"github.com/joho/godotenv"
 	"log"
 	"strings"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	sio, err := socketIO.NewSocketIOClient(
 		"husrv.anotalk.hu",
 	)
@@ -17,7 +23,7 @@ func main() {
 	}
 
 	chat := annotalk.NewChat(true, sio)
-	chat.StartNewChat(annotalk.Person{
+	chat.StartNewChat(annotalk.Persona{
 		Name:               "Viktor",
 		Age:                27,
 		Gender:             annotalk.Woman,

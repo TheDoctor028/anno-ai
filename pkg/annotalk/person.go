@@ -8,7 +8,7 @@ const (
 	Whatever              = "whatever"
 )
 
-type Person struct {
+type Persona struct {
 	Name               string       `json:"name"`
 	Age                int          `json:"age"`
 	Gender             PersonGender `json:"gender"`

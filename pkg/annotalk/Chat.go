@@ -32,7 +32,7 @@ type Chat struct {
 	conversationsID *string
 	messages        []Message
 	stats           OnStatisticsData
-	person          *Person
+	person          *Persona
 
 	MessageEventsChannels *MessageEvents
 }
@@ -54,7 +54,7 @@ func NewChat(filterStats bool, client *socketIO.Client) *Chat {
 	return c
 }
 
-func (c *Chat) StartNewChat(self Person) {
+func (c *Chat) StartNewChat(self Persona) {
 	if c.inChat {
 		log.Println("You are already in a chat")
 		return
@@ -124,7 +124,7 @@ func (c *Chat) onChatEnd() {
 	msgsJson, err := json.Marshal(struct {
 		Id        string    `json:"id"`
 		Timestamp string    `json:"timestamp"`
-		Person    Person    `json:"person"`
+		Person    Persona   `json:"person"`
 		Messages  []Message `json:"messages"`
 	}{
 		Id:        *c.conversationsID,
