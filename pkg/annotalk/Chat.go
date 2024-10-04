@@ -6,10 +6,22 @@ import (
 )
 import "github.com/TheDoctor028/annotalk-chatgpt/pkg/utils"
 
+const (
+	Partner = "partner"
+	User    = "user"
+	Bot     = "bot"
+)
+
+type Message struct {
+	Entity string `json:"entity"`
+	Msg    string `json:"message"`
+}
+
 type Chat struct {
 	filterStats    bool
 	client         *socketIO.Client
 	alreadyHadChat bool
+	messages       []Message
 
 	MessageEventsChannels *MessageEvents
 }
@@ -21,6 +33,8 @@ func NewChat(filterStats bool, client *socketIO.Client) *Chat {
 		alreadyHadChat: false,
 		filterStats:    filterStats,
 		client:         client,
+
+		messages: []Message{},
 	}
 
 	go c.MessageHandler()
@@ -34,7 +48,7 @@ func (c *Chat) StartNewChat(self Person) {
 		Data: InitChatData{
 			Gender:        self.Gender,
 			PartnerGender: self.InterestedInGender,
-			CaptchaID:     utils.RandStringRunes(20), // TODO investigate this
+			CaptchaID:     utils.RandStringRunes(20),
 		},
 	}
 	<-c.MessageEventsChannels.SearchingPartner
@@ -57,7 +71,9 @@ func (c *Chat) MessageHandler() {
 				go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 			case string(OnMessage):
 				if NewOnMessageData(msg.Data).IsYou == 0 {
-					log.Printf("Your partner: %v", NewOnMessageData(msg.Data).Message)
+					msgTxt := NewOnMessageData(msg.Data).Message
+					log.Printf("Your partner: %v", msgTxt)
+					c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
 					go func() { c.MessageEventsChannels.Message <- NewOnMessageData(msg.Data) }()
 				}
 			case string(OnChatEnd):
