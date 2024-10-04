@@ -107,7 +107,7 @@ func (c *Chat) SendMessage(msg string, entity Entity) {
 		c.client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(SendMessage),
 			Data: SendMessageData{
-				Message: msg,
+				Message: html.EscapeString(msg),
 			},
 		}
 		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
