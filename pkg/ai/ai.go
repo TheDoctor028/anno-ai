@@ -17,10 +17,11 @@ hogy nem ismerjuk egymást és semmit nem tudunk egymásról.
 Te egy {{ .Age }} éves {{ .Gender }} vagy aki {{ .InterestedInGender }} szeretne beszélgetni. 
 A partneredről nem tudsz semmit csak a nemét ami {{ .PartnerGender }}. 
 A válaszaid olyanok legyenek, mint ha chaten beszélnénk.
+Csak egyszeru smiley-kat használj pl. :) vagy :D stb.
 {{- if .Description }} 
 Egy rövid leírás rólad:
 {{ .Description }}
-{{- end if }}
+{{- end }}
 `
 
 type AI struct {
@@ -30,7 +31,7 @@ type AI struct {
 	instructions string
 }
 
-func NewAI(persona annotalk.Persona) (*AI, error) {
+func NewAI(persona annotalk.Persona, partnerGender annotalk.PersonGender) (*AI, error) {
 	token := os.Getenv("CHAT_GPT_TOKEN")
 	if token == "" {
 		return nil, errors.New("CHAT_GPT_TOKEN is not provided")
@@ -44,7 +45,13 @@ func NewAI(persona annotalk.Persona) (*AI, error) {
 	}
 
 	buf := bytes.NewBuffer(nil)
-	err = baseTmplt.Execute(buf, persona)
+	err = baseTmplt.Execute(buf, struct {
+		PartnerGender annotalk.PersonGender
+		annotalk.Persona
+	}{
+		Persona:       persona,
+		PartnerGender: partnerGender,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -60,13 +67,13 @@ func (a *AI) GetAnswer(messages []annotalk.Message) (string, error) {
 	resp, err := a.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: openai.GPT3Dot5Turbo,
-			Messages: []openai.ChatCompletionMessage{
+			Model: openai.GPT4oMini, // TODO might change this
+			Messages: append([]openai.ChatCompletionMessage{
 				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: "Hello!",
+					Role:    openai.ChatMessageRoleSystem,
+					Content: a.instructions,
 				},
-			},
+			}, mapMessagesToOpenAIMessages(messages)...),
 		},
 	)
 
@@ -75,7 +82,29 @@ func (a *AI) GetAnswer(messages []annotalk.Message) (string, error) {
 		return "", err
 	}
 
-	fmt.Println(resp.Choices[0].Message.Content)
-
 	return resp.Choices[0].Message.Content, nil
+}
+
+func mapMessagesToOpenAIMessages(messages []annotalk.Message) []openai.ChatCompletionMessage {
+	var openAIMessages []openai.ChatCompletionMessage
+	for _, msg := range messages {
+		if len(msg.Msg) == 0 {
+			continue
+		}
+
+		if msg.Entity == annotalk.Partner {
+			openAIMessages = append(openAIMessages, openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleUser,
+				Content: msg.Msg,
+			})
+		}
+		if msg.Entity == annotalk.Bot || msg.Entity == annotalk.User {
+			openAIMessages = append(openAIMessages, openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleAssistant,
+				Content: msg.Msg,
+			})
+		}
+	}
+
+	return openAIMessages
 }
