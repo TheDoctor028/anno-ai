@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
+	"html"
 	"log"
 	"math/rand"
 	"os"
@@ -196,7 +197,7 @@ func (c *Chat) onChatEnd() {
 
 func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 	if NewOnMessageData(msg.Data).IsYou == 0 {
-		msgTxt := NewOnMessageData(msg.Data).Message
+		msgTxt := html.UnescapeString(NewOnMessageData(msg.Data).Message)
 		log.Printf("Partner: %v", msgTxt)
 		c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
 		c.aiResponseTimer.Reset(time.Duration((rand.Int()%5)+5) * time.Second)
