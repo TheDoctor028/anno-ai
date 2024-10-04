@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type SocketIOClient struct {
+type Client struct {
 	ws *websocket.Conn
 
 	ReceiveMessage chan []byte
@@ -24,36 +24,15 @@ type SocketIOClient struct {
 	rest           *resty.Client
 }
 
-func NewSocketIOClient(host string) *SocketIOClient {
-	r := resty.New()
-
-	initRes, err := r.R().Get(fmt.Sprintf("https://%s/socket.io/?EIO=3&transport=polling&t=P9JsPIX", host))
+func NewSocketIOClient(host string) (*Client, error) {
+	socketIOConfig, err := getSID(host)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	if initRes == nil || initRes.StatusCode() != http.StatusOK {
-		log.Fatal("No response received for socket.io init")
-	}
-
-	woPrefix, _ := strings.CutPrefix(initRes.String(), "96:0")
-	jsonString, _ := strings.CutSuffix(woPrefix, "2:40")
-
-	var socketIOConfig struct {
-		Sid          string `json:"sid,omitempty"`
-		PingInterval int    `json:"pingInterval,omitempty"`
-		PingTimeout  int    `json:"pingTimeout,omitempty"`
-	}
-	err = json.Unmarshal([]byte(jsonString), &socketIOConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println(socketIOConfig.Sid)
 
 	u, err := url.Parse(fmt.Sprintf("wss://%s/socket.io/?EIO=3&transport=websocket&sid=%s", host, socketIOConfig.Sid))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	log.Printf("Connecting to %s", u.String())
@@ -62,13 +41,10 @@ func NewSocketIOClient(host string) *SocketIOClient {
 		Proxy:             http.ProxyFromEnvironment,
 		HandshakeTimeout:  5 * time.Second,
 		Subprotocols:      []string{"soap"},
-		EnableCompression: true,
+		EnableCompression: false,
 	}
 
-	h := http.Header{}
-	h.Add("Accept", "*/*")
-
-	ws, res, err := d.Dial(u.String(), h)
+	ws, res, err := d.Dial(u.String(), nil)
 	if err != nil {
 		if res != nil {
 			defer res.Body.Close()
@@ -78,7 +54,7 @@ func NewSocketIOClient(host string) *SocketIOClient {
 		log.Fatal(err)
 	}
 
-	c := &SocketIOClient{
+	c := &Client{
 		ReceiveMessage: make(chan []byte),
 		SendMessage:    make(chan []byte),
 
@@ -108,6 +84,7 @@ func NewSocketIOClient(host string) *SocketIOClient {
 		}
 		log.Println("Sent ACKHELLO")
 
+		go c.handleIncoming()
 		go c.startPing(time.Duration(socketIOConfig.PingInterval)*time.Millisecond, c.Done)
 		ws.SetCloseHandler(func(code int, text string) error {
 			c.Done <- struct{}{}
@@ -115,10 +92,41 @@ func NewSocketIOClient(host string) *SocketIOClient {
 		})
 	}
 
-	return c
+	return c, nil
 }
 
-func (c *SocketIOClient) startPing(healthCheckTime time.Duration, done chan struct{}) {
+func getSID(host string) (*struct {
+	Sid          string `json:"sid,omitempty"`
+	PingInterval int    `json:"pingInterval,omitempty"`
+	PingTimeout  int    `json:"pingTimeout,omitempty"`
+}, error) {
+	r := resty.New()
+
+	initRes, err := r.R().Get(fmt.Sprintf("https://%s/socket.io/?EIO=3&transport=polling&t=P9JsPIX", host))
+	if err != nil {
+		return nil, err
+	}
+
+	if initRes == nil || initRes.StatusCode() != http.StatusOK {
+		return nil, err
+	}
+
+	woPrefix, _ := strings.CutPrefix(initRes.String(), "96:0")
+	jsonString, _ := strings.CutSuffix(woPrefix, "2:40")
+
+	var socketIOConfig struct {
+		Sid          string `json:"sid,omitempty"`
+		PingInterval int    `json:"pingInterval,omitempty"`
+		PingTimeout  int    `json:"pingTimeout,omitempty"`
+	}
+	err = json.Unmarshal([]byte(jsonString), &socketIOConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &socketIOConfig, err
+}
+
+func (c *Client) startPing(healthCheckTime time.Duration, done chan struct{}) {
 	ticker := time.NewTicker(healthCheckTime)
 	defer c.ws.Close()
 
@@ -130,11 +138,28 @@ func (c *SocketIOClient) startPing(healthCheckTime time.Duration, done chan stru
 				return
 			}
 			log.Println("Ping ---->")
-			<-c.pong
-			log.Println("<---- Pong")
 		case <-done:
 			return
 		}
 	}
 
+}
+
+func (c *Client) handleIncoming() {
+	for {
+		_, msg, err := c.ws.ReadMessage()
+		if err != nil {
+			log.Println("Error reading message: ", err)
+		}
+
+		if string(msg) == PONG {
+			log.Println("<---- Pong")
+			continue
+		}
+		if strings.HasPrefix(string(msg), MESSAGE_SERVER) {
+			c.ReceiveMessage <- []byte(strings.TrimPrefix(string(msg), MESSAGE_SERVER))
+		} else {
+			log.Printf("Received unknow type message: %s", string(msg))
+		}
+	}
 }
