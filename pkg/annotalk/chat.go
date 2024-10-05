@@ -172,7 +172,7 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 	c.inChat = true
 	c.conversationsID = &data.ChatID
 	c.partnerGender = &data.PartnerGender
-	log.Printf("Bot %s started with a chat with a %s", c.person.Name, NewOnChatStartData(msg.Data).PartnerGender)
+	log.Printf("Bot %s started a chat with a %s", c.person.Name, NewOnChatStartData(msg.Data).PartnerGender)
 	go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 }
 
