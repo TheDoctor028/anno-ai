@@ -99,7 +99,7 @@ func (c *Chat) StartNewChat(self Persona) {
 func (c *Chat) FindNewPartner() {
 	if !c.inChat && c.person != nil {
 		c.messages = []Message{}
-		log.Println("Finding new partner")
+		log.Printf("%s is looking for new partner", c.person.Name)
 		c.client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(LookForPartner),
 		}
@@ -117,7 +117,7 @@ func (c *Chat) SendMessage(msg string, entity Entity) {
 		}
 		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
 		if entity == Bot {
-			log.Println("Bot: ", msg)
+			log.Printf("Bot (%s) -> Partner: %s", c.person.Name, msg)
 		}
 	} else {
 		log.Println("You are not in a chat")
@@ -152,7 +152,7 @@ func (c *Chat) messageHandler() {
 			case string(OnChatEnd):
 				c.onChatEnd()
 			case string(OnSearchingPartner):
-				log.Println("Searching for partner")
+				log.Printf("Bot %s is searching for partner", c.person.Name)
 				go func() { c.MessageEventsChannels.SearchingPartner <- struct{}{} }()
 			}
 		case <-c.aiResponseTimer.C:
@@ -166,12 +166,12 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 	c.inChat = true
 	c.conversationsID = &data.ChatID
 	c.partnerGender = &data.PartnerGender
-	log.Printf("Chat started with a %s", NewOnChatStartData(msg.Data).PartnerGender)
+	log.Printf("Bot %s started with a chat with a %s", c.person.Name, NewOnChatStartData(msg.Data).PartnerGender)
 	go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 }
 
 func (c *Chat) onChatEnd() {
-	log.Println("Chat ended")
+	log.Printf("Chat ended for Bot %s", c.person.Name)
 
 	msgsJson, err := json.Marshal(struct {
 		Id            string       `json:"id"`
@@ -203,7 +203,7 @@ func (c *Chat) onChatEnd() {
 func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
 	if NewOnMessageData(msg.Data).IsYou == 0 {
 		msgTxt := html.UnescapeString(NewOnMessageData(msg.Data).Message)
-		log.Printf("Partner: %v", msgTxt)
+		log.Printf("Partner -> Bot %s: %v", c.person.Name, msgTxt)
 		c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
 		c.aiResponseTimer.Reset(time.Duration((rand.Int()%5)+5) * time.Second)
 		go func() { c.MessageEventsChannels.Message <- NewOnMessageData(msg.Data) }()
@@ -217,7 +217,7 @@ func (c *Chat) sendAIMessage() {
 			c.client.SendMessage <- socketIO.OutgoingMessage{
 				Type: string(Typing),
 			}
-			log.Println("Bot is typing...")
+			log.Printf("Bot %s is typing...", c.person.Name)
 			msg, err := c.ai.GetAnswer(c.messages)
 			wc := strings.Count(msg, " ")
 			typeTO := time.NewTimer(time.Duration(math.Ceil(float64(wc)*avgWordsPerSecond)) * time.Second)
