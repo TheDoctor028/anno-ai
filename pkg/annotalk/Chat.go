@@ -3,7 +3,7 @@ package annotalk
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
+	"github.com/TheDoctor028/anno-ai/pkg/socketIO"
 	"html"
 	"log"
 	"math/rand"
@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 )
-import "github.com/TheDoctor028/annotalk-chatgpt/pkg/utils"
+import "github.com/TheDoctor028/anno-ai/pkg/utils"
 
 type Entity string
 

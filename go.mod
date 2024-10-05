@@ -1,4 +1,4 @@
-module github.com/TheDoctor028/annotalk-chatgpt
+module github.com/TheDoctor028/anno-ai
 
 go 1.23
 

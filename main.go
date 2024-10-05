@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/TheDoctor028/annotalk-chatgpt/pkg/annotalk"
-	"github.com/TheDoctor028/annotalk-chatgpt/pkg/socketIO"
+	"github.com/TheDoctor028/anno-ai/pkg/annotalk"
+	"github.com/TheDoctor028/anno-ai/pkg/socketIO"
 	"github.com/joho/godotenv"
 	"log"
 	"strings"
