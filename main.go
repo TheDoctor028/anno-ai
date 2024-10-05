@@ -32,7 +32,7 @@ func startAnnoTalkChat(err error) {
 		Age:                25,
 		Gender:             annotalk.Man,
 		InterestedInGender: annotalk.Whatever,
-		Description:        "",
+		Description:        "Rövid üzeneteket ír és gyakaran hibázik, elüti a betűket.",
 	})
 
 	go func() {

@@ -6,12 +6,17 @@ import (
 	"github.com/TheDoctor028/anno-ai/pkg/socketIO"
 	"html"
 	"log"
+	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
 import "github.com/TheDoctor028/anno-ai/pkg/utils"
+
+const avgWordsPerMinute = 40.0
+const avgWordsPerSecond = avgWordsPerMinute / 60.0
 
 type Entity string
 
@@ -212,7 +217,12 @@ func (c *Chat) sendAIMessage() {
 			c.client.SendMessage <- socketIO.OutgoingMessage{
 				Type: string(Typing),
 			}
+			log.Println("Bot is typing...")
 			msg, err := c.ai.GetAnswer(c.messages)
+			wc := strings.Count(msg, " ")
+			typeTO := time.NewTimer(time.Duration(math.Ceil(float64(wc)*avgWordsPerSecond)) * time.Second)
+			<-typeTO.C
+
 			if err != nil {
 				log.Printf("Error getting answer %s", err)
 			} else {
