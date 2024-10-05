@@ -101,7 +101,7 @@ func (c *Chat) StartNewChat(self Persona) {
 func (c *Chat) FindNewPartner() {
 	if !c.inChat && c.person != nil {
 		c.messages = []Message{}
-		log.Printf("%s is looking for new partner", c.person.Name)
+		log.Printf("Bot %s is looking for new partner", c.person.Name)
 		c.client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(LookForPartner),
 		}
@@ -119,7 +119,7 @@ func (c *Chat) SendMessage(msg string, entity Entity) {
 		}
 		c.messages = append(c.messages, Message{Entity: entity, Msg: msg})
 		if entity == Bot {
-			log.Printf("Bot (%s) -> Partner: %s", c.person.Name, msg)
+			log.Printf("Bot %s -> Partner: %s", c.person.Name, msg)
 		}
 	} else {
 		log.Println("You are not in a chat")

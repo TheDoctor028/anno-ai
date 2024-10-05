@@ -15,10 +15,10 @@ func main() {
 	}
 	personas := []annotalk.Persona{
 		{
-			Name:               "Alice",
+			Name:               "Lali",
 			Age:                25,
 			Gender:             annotalk.Man,
-			InterestedInGender: annotalk.Woman,
+			InterestedInGender: annotalk.Whatever,
 			Description:        "",
 		},
 	}
