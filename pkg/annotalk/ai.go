@@ -11,6 +11,7 @@ import (
 	"text/template"
 )
 
+// TODO make this loaded from file
 const baseInstructionsHUN = `
 Légy a beszélgető partnerem, mint ha cheten beszélgetnénk úgy, 
 hogy nem ismerjuk egymást és semmit nem tudunk egymásról. 
@@ -69,7 +70,7 @@ func (a *AI) GetAnswer(messages []Message) (string, error) {
 	resp, err := a.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: openai.GPT4oMini, // TODO might change this
+			Model: openai.GPT4oMini, // TODO make this configurable
 			Messages: append([]openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
