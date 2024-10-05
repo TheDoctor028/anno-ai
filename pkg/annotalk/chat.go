@@ -36,6 +36,7 @@ type Chat struct {
 	client         *socketIO.Client
 	ai             *AI
 	inChat         bool
+	lookingForChat bool
 	alreadyHadChat bool
 
 	conversationsID  *string
@@ -56,6 +57,7 @@ func NewChat(filterStats bool, client *socketIO.Client, autoStartNewChat bool) *
 
 		inChat:           false,
 		alreadyHadChat:   false,
+		lookingForChat:   false,
 		filterStats:      filterStats,
 		client:           client,
 		autoStartNewChat: autoStartNewChat,
@@ -100,12 +102,14 @@ func (c *Chat) StartNewChat(self Persona) {
 
 func (c *Chat) FindNewPartner() {
 	if !c.inChat && c.person != nil {
+		c.lookingForChat = true
 		c.messages = []Message{}
-		log.Printf("Bot %s is looking for new partner", c.person.Name)
+		log.Printf("Bot %s is going to look for new partner", c.person.Name)
 		c.client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(LookForPartner),
 		}
 		<-c.MessageEventsChannels.ChatStart
+		c.lookingForChat = false
 	}
 }
 
@@ -152,7 +156,7 @@ func (c *Chat) messageHandler() {
 			case string(OnMessage):
 				c.onMessage(msg)
 			case string(OnChatEnd):
-				c.onChatEnd(false)
+				c.onChatEnd()
 			case string(OnSearchingPartner):
 				log.Printf("Bot %s is searching for partner", c.person.Name)
 				go func() { c.MessageEventsChannels.SearchingPartner <- struct{}{} }()
@@ -172,7 +176,7 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 	go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 }
 
-func (c *Chat) onChatEnd(force bool) {
+func (c *Chat) onChatEnd() {
 	log.Printf("Chat ended for Bot %s", c.person.Name)
 
 	msgsJson, err := json.Marshal(struct {
@@ -200,8 +204,8 @@ func (c *Chat) onChatEnd(force bool) {
 	c.conversationsID = nil
 	c.inChat = false
 	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
-	if c.autoStartNewChat && !force {
-		c.FindNewPartner()
+	if c.autoStartNewChat && !c.lookingForChat {
+		go c.FindNewPartner()
 	}
 }
 
