@@ -163,7 +163,7 @@ func (c *Chat) SaveChat(fileName string) {
 	}
 
 	fs := fmt.Sprintf("data/conversations/%s.json", fileName)
-	if err := os.WriteFile(fileName, msgsJson, 0644); err != nil {
+	if err := os.WriteFile(fs, msgsJson, 0644); err != nil {
 		log.Printf("Error writing conversation to file %s %s", fs, err)
 	}
 }

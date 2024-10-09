@@ -63,7 +63,7 @@ func main() {
 			}
 			if msg == "exit" {
 				for _, chat := range chats {
-					chat.SaveChat(fmt.Sprintf("%d.bak.json", chat.GetTS().Unix()))
+					chat.SaveChat(fmt.Sprintf("%d.bak", chat.GetTS().Unix()))
 					if chat.Client.IsConnected() {
 						chat.EndChat()
 					}
