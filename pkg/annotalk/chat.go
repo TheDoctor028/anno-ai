@@ -15,7 +15,7 @@ import (
 )
 import "github.com/TheDoctor028/anno-ai/pkg/utils"
 
-const avgWordsPerMinute = 40.0
+const avgWordsPerMinute = 35.0
 const avgWordsPerSecond = avgWordsPerMinute / 60.0
 
 type Entity string
@@ -210,7 +210,7 @@ func (c *Chat) onChatEnd() {
 }
 
 func (c *Chat) onMessage(msg socketIO.IncomingMessage) {
-	if NewOnMessageData(msg.Data).IsYou == 0 {
+	if NewOnMessageData(msg.Data).IsYou == MessageFromPartner {
 		msgTxt := html.UnescapeString(NewOnMessageData(msg.Data).Message)
 		log.Printf("Partner -> Bot %s: %v", c.person.Name, msgTxt)
 		c.messages = append(c.messages, Message{Entity: Partner, Msg: msgTxt})
