@@ -22,6 +22,7 @@ type Client struct {
 	pong           chan struct{}
 	dialer         *websocket.Dialer
 	rest           *resty.Client
+	isConnected    bool
 }
 
 func NewSocketIOClient(host string) (*Client, error) {
@@ -58,9 +59,10 @@ func NewSocketIOClient(host string) (*Client, error) {
 		ReceiveMessage: make(chan IncomingMessage),
 		SendMessage:    make(chan OutgoingMessage),
 
-		ws:     ws,
-		dialer: d,
-		Done:   make(chan struct{}),
+		ws:          ws,
+		dialer:      d,
+		Done:        make(chan struct{}),
+		isConnected: true,
 	}
 
 	log.Printf("Connected to %s", u.String())
@@ -88,12 +90,17 @@ func NewSocketIOClient(host string) (*Client, error) {
 		go c.handleIncoming()
 		go c.startPing(time.Duration(socketIOConfig.PingInterval)*time.Millisecond, c.Done)
 		ws.SetCloseHandler(func(code int, text string) error {
+			c.isConnected = false
 			c.Done <- struct{}{}
 			return nil
 		})
 	}
 
 	return c, nil
+}
+
+func (c *Client) IsConnected() bool {
+	return c.isConnected
 }
 
 func getSID(host string) (*struct {

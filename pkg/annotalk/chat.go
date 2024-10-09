@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +33,8 @@ type Message struct {
 }
 
 type Chat struct {
+	Client         *socketIO.Client
 	filterStats    bool
-	client         *socketIO.Client
 	ai             *AI
 	inChat         bool
 	lookingForChat bool
@@ -59,7 +60,7 @@ func NewChat(filterStats bool, client *socketIO.Client, autoStartNewChat bool) *
 		alreadyHadChat:   false,
 		lookingForChat:   false,
 		filterStats:      filterStats,
-		client:           client,
+		Client:           client,
 		autoStartNewChat: autoStartNewChat,
 
 		messages:        []Message{},
@@ -80,7 +81,7 @@ func (c *Chat) StartNewChat(self Persona) {
 	c.person = &self
 	c.messages = []Message{}
 	log.Printf("Starting new chat as %s(%d %s) to talk with %s", self.Name, self.Age, self.Gender, self.InterestedInGender)
-	c.client.SendMessage <- socketIO.OutgoingMessage{
+	c.Client.SendMessage <- socketIO.OutgoingMessage{
 		Type: string(InitChat),
 		Data: InitChatData{
 			Gender:        self.Gender,
@@ -105,7 +106,7 @@ func (c *Chat) FindNewPartner() {
 		c.lookingForChat = true
 		c.messages = []Message{}
 		log.Printf("Bot %s is going to look for new partner", c.person.Name)
-		c.client.SendMessage <- socketIO.OutgoingMessage{
+		c.Client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(LookForPartner),
 		}
 		<-c.MessageEventsChannels.ChatStart
@@ -115,7 +116,7 @@ func (c *Chat) FindNewPartner() {
 
 func (c *Chat) SendMessage(msg string, entity Entity) {
 	if c.inChat {
-		c.client.SendMessage <- socketIO.OutgoingMessage{
+		c.Client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(SendMessage),
 			Data: SendMessageData{
 				Message: html.EscapeString(msg),
@@ -132,7 +133,7 @@ func (c *Chat) SendMessage(msg string, entity Entity) {
 
 func (c *Chat) EndChat() {
 	if c.inChat {
-		c.client.SendMessage <- socketIO.OutgoingMessage{
+		c.Client.SendMessage <- socketIO.OutgoingMessage{
 			Type: string(LeaveChat),
 			Data: map[string]interface{}{},
 		}
@@ -144,7 +145,7 @@ func (c *Chat) EndChat() {
 func (c *Chat) messageHandler() {
 	for {
 		select {
-		case msg := <-c.client.ReceiveMessage:
+		case msg := <-c.Client.ReceiveMessage:
 			switch msg.Type {
 			case string(OnStatistics):
 				if !c.filterStats {
@@ -179,6 +180,17 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 func (c *Chat) onChatEnd() {
 	log.Printf("Chat ended for Bot %s", c.person.Name)
 
+	c.SaveChat(strconv.FormatInt(time.Now().Unix(), 10))
+
+	c.conversationsID = nil
+	c.inChat = false
+	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
+	if c.autoStartNewChat && !c.lookingForChat {
+		go c.FindNewPartner()
+	}
+}
+
+func (c *Chat) SaveChat(fileName string) {
 	msgsJson, err := json.Marshal(struct {
 		Id            string       `json:"id"`
 		Timestamp     string       `json:"timestamp"`
@@ -196,16 +208,9 @@ func (c *Chat) onChatEnd() {
 		log.Printf("Error marshalling messages %s", err)
 	}
 
-	fileName := fmt.Sprintf("data/conversations/%d.json", time.Now().Unix())
+	fs := fmt.Sprintf("data/conversations/%s.json", fileName)
 	if err := os.WriteFile(fileName, msgsJson, 0644); err != nil {
-		log.Printf("Error writing conversation to file %s %s", fileName, err)
-	}
-
-	c.conversationsID = nil
-	c.inChat = false
-	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
-	if c.autoStartNewChat && !c.lookingForChat {
-		go c.FindNewPartner()
+		log.Printf("Error writing conversation to file %s %s", fs, err)
 	}
 }
 
@@ -223,7 +228,7 @@ func (c *Chat) sendAIMessage() {
 	if c.inChat && (len(c.messages) > 0 && c.messages[len(c.messages)-1].Entity != Bot) {
 		if c.typing.TryLock() {
 			defer c.typing.Unlock()
-			c.client.SendMessage <- socketIO.OutgoingMessage{
+			c.Client.SendMessage <- socketIO.OutgoingMessage{
 				Type: string(Typing),
 			}
 			log.Printf("Bot %s is typing...", c.person.Name)
@@ -236,7 +241,7 @@ func (c *Chat) sendAIMessage() {
 				log.Printf("Error getting answer %s", err)
 			} else {
 				c.SendMessage(msg, Bot)
-				c.client.SendMessage <- socketIO.OutgoingMessage{
+				c.Client.SendMessage <- socketIO.OutgoingMessage{
 					Type: string(DoneTyping),
 				}
 			}

@@ -6,6 +6,7 @@ import (
 	"github.com/TheDoctor028/anno-ai/pkg/socketIO"
 	"github.com/joho/godotenv"
 	"log"
+	"time"
 )
 
 func main() {
@@ -63,7 +64,10 @@ func main() {
 			}
 			if msg == "exit" {
 				for _, chat := range chats {
-					chat.EndChat()
+					chat.SaveChat(fmt.Sprintf("%d.bak.json", time.Now().Unix()))
+					if chat.Client.IsConnected() {
+						chat.EndChat()
+					}
 				}
 				return
 			}
