@@ -153,7 +153,7 @@ func (c *Chat) SaveChat(fileName string) {
 		Messages      []Message    `json:"messages"`
 	}{
 		Id:            *c.conversationsID,
-		Timestamp:     time.Now().Format(time.RFC3339),
+		Timestamp:     c.timeStamp.Format(time.RFC3339),
 		Person:        *c.person,
 		PartnerGender: *c.partnerGender,
 		Messages:      c.messages,
