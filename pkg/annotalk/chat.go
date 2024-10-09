@@ -48,6 +48,7 @@ type Chat struct {
 	typing           sync.Mutex
 	aiResponseTimer  *time.Timer
 	autoStartNewChat bool
+	timeStamp        time.Time
 
 	MessageEventsChannels *MessageEvents
 }
@@ -66,6 +67,7 @@ func NewChat(filterStats bool, client *socketIO.Client, autoStartNewChat bool) *
 		messages:        []Message{},
 		person:          nil,
 		aiResponseTimer: time.NewTimer(time.Duration((rand.Int()%15)+5) * time.Second),
+		timeStamp:       time.Now(),
 	}
 
 	go c.messageHandler()
@@ -142,6 +144,34 @@ func (c *Chat) EndChat() {
 	}
 }
 
+func (c *Chat) SaveChat(fileName string) {
+	msgsJson, err := json.Marshal(struct {
+		Id            string       `json:"id"`
+		Timestamp     string       `json:"timestamp"`
+		Person        Persona      `json:"person"`
+		PartnerGender PersonGender `json:"partnerGender"`
+		Messages      []Message    `json:"messages"`
+	}{
+		Id:            *c.conversationsID,
+		Timestamp:     time.Now().Format(time.RFC3339),
+		Person:        *c.person,
+		PartnerGender: *c.partnerGender,
+		Messages:      c.messages,
+	})
+	if err != nil {
+		log.Printf("Error marshalling messages %s", err)
+	}
+
+	fs := fmt.Sprintf("data/conversations/%s.json", fileName)
+	if err := os.WriteFile(fileName, msgsJson, 0644); err != nil {
+		log.Printf("Error writing conversation to file %s %s", fs, err)
+	}
+}
+
+func (c *Chat) GetTS() time.Time {
+	return c.timeStamp
+}
+
 func (c *Chat) messageHandler() {
 	for {
 		select {
@@ -173,6 +203,7 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 	c.inChat = true
 	c.conversationsID = &data.ChatID
 	c.partnerGender = &data.PartnerGender
+	c.timeStamp = time.Now()
 	log.Printf("Bot %s started a chat with a %s", c.person.Name, NewOnChatStartData(msg.Data).PartnerGender)
 	go func() { c.MessageEventsChannels.ChatStart <- NewOnChatStartData(msg.Data) }()
 }
@@ -180,37 +211,13 @@ func (c *Chat) onChatStart(msg socketIO.IncomingMessage) {
 func (c *Chat) onChatEnd() {
 	log.Printf("Chat ended for Bot %s", c.person.Name)
 
-	c.SaveChat(strconv.FormatInt(time.Now().Unix(), 10))
+	c.SaveChat(strconv.FormatInt(c.timeStamp.Unix(), 10))
 
 	c.conversationsID = nil
 	c.inChat = false
 	go func() { c.MessageEventsChannels.ChatEnd <- struct{}{} }()
 	if c.autoStartNewChat && !c.lookingForChat {
 		go c.FindNewPartner()
-	}
-}
-
-func (c *Chat) SaveChat(fileName string) {
-	msgsJson, err := json.Marshal(struct {
-		Id            string       `json:"id"`
-		Timestamp     string       `json:"timestamp"`
-		Person        Persona      `json:"person"`
-		PartnerGender PersonGender `json:"partnerGender"`
-		Messages      []Message    `json:"messages"`
-	}{
-		Id:            *c.conversationsID,
-		Timestamp:     time.Now().Format(time.RFC3339),
-		Person:        *c.person,
-		PartnerGender: *c.partnerGender,
-		Messages:      c.messages,
-	})
-	if err != nil {
-		log.Printf("Error marshalling messages %s", err)
-	}
-
-	fs := fmt.Sprintf("data/conversations/%s.json", fileName)
-	if err := os.WriteFile(fileName, msgsJson, 0644); err != nil {
-		log.Printf("Error writing conversation to file %s %s", fs, err)
 	}
 }
 
