@@ -16,7 +16,7 @@ import (
 )
 import "github.com/TheDoctor028/anno-ai/pkg/utils"
 
-const avgWordsPerMinute = 25.0
+const avgWordsPerMinute = 20.0
 const avgWordsPerSecond = avgWordsPerMinute / 60.0
 
 type Entity string
