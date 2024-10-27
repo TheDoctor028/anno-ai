@@ -6,6 +6,7 @@ import (
 	"github.com/TheDoctor028/anno-ai/pkg/socketIO"
 	"github.com/joho/godotenv"
 	"log"
+	"os"
 )
 
 func main() {
@@ -76,7 +77,7 @@ func main() {
 
 func startAnnoTalkChat(persona annotalk.Persona) *annotalk.Chat {
 	sio, err := socketIO.NewSocketIOClient(
-		"husrv.anotalk.hu",
+		os.Getenv("ANO_TALK_WEBSOCKET_HOST"),
 	)
 	if err != nil {
 		panic(err)
