@@ -3,5 +3,7 @@ vendor/
 data/
 venv/
 
+ai/db.sqlite3*
+
 .env
 main
