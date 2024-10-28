@@ -1,6 +1,7 @@
 .idea/
 vendor/
 data/
+venv/
 
 .env
 main
